@@ -80,7 +80,7 @@ classdef LinOpPropagator <  LinOp
             assert(issize(sz) && (length(sz)==2),'The input size sz should be a conformable  to size(2D) ');
             
             this.theta = theta;
-            this.Nt = numel(theta)/2;
+            this.Nt = max([numel(theta)/2,numel(lambda),numel(z)]);
             this.sizein = sz ;
             this.sizeout = [sz this.Nt];
             this.sizeinC = this.sizein;
@@ -143,10 +143,10 @@ classdef LinOpPropagator <  LinOp
             Nx_ = this.Nx;
             Ny_ = this.Ny;
             dxy_ = this.dxy;
-            theta_ = this.theta;
+            theta_ = this.theta.*ones(2,this.Nt);
             n0_ = this.n0;
-            lambda_ = this.lambda;
-            z_ = this.z;
+            lambda_ = this.lambda.*ones(1,this.Nt);
+            z_ = this.z.*ones(1,this.Nt);
             
             
             this.unifInten =  true;

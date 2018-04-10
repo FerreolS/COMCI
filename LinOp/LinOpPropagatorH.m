@@ -86,7 +86,7 @@ classdef LinOpPropagatorH <  LinOp
             assert(issize(sz) && (length(sz)==2),'The input size sz should be a conformable  to size(2D) ');
             
             this.theta = theta;
-            this.Nt = numel(theta)/2;
+            this.Nt = max([numel(theta)/2,numel(lambda),numel(z)]);
             this.sizein = sz ;
             this.sizeout = [sz this.Nt];
             this.sizeinC = this.sizein;
@@ -148,6 +148,12 @@ classdef LinOpPropagatorH <  LinOp
             ephi_ = zeros(this.sizeoutC);
             Nx_ = this.Nx;
             Ny_ = this.Ny;
+            dxy_ = this.dxy;
+            theta_ = this.theta.*ones(2,this.Nt);
+            n0_ = this.n0;
+            lambda_ = this.lambda.*ones(1,this.Nt);
+            z_ = this.z.*ones(1,this.Nt);
+            
             if numel(this.illu)==1
                 illu_ = this.illu.*ones(1, this.Nt);
             else
@@ -156,29 +162,29 @@ classdef LinOpPropagatorH <  LinOp
             
             for nt = 1:this.Nt
                 %  frequency grid
-                v = 1./(Nx_ *  this.dxy) *( [0:ceil( Nx_/2)-1, -floor( Nx_/2):-1]' -    this.dxy *   sin( this.theta(1,nt))/ this.lambda(nt).*Nx_);
-                u = 1./(Ny_ *  this.dxy) * ([0:ceil( Ny_/2)-1, -floor( Ny_/2):-1] -     this.dxy *   sin( this.theta(2,nt))/ this.lambda(nt).*Ny_);
+                v = 1./(Nx_ *  dxy_) *( [0:ceil( Nx_/2)-1, -floor( Nx_/2):-1]' -    dxy_ *   sin( theta_(1,nt))/ lambda_(nt).*Nx_);
+                u = 1./(Ny_ *  dxy_) * ([0:ceil( Ny_/2)-1, -floor( Ny_/2):-1] -     dxy_ *   sin( theta_(2,nt))/ lambda_(nt).*Ny_);
                 
                 
                 [mu,mv] =  meshgrid(  u.^2,  v.^2);
                 Mesh = mv + mu;
                 
-                if (max(Mesh(:))>( this.n0/  this.lambda(nt))^2)
-                    mod = illu_(nt).* (Mesh<= ( this.n0/  this.lambda(nt))^2);
+                if (max(Mesh(:))>( n0_/  lambda_(nt))^2)
+                    mod = illu_(nt).* (Mesh<= ( n0_/  lambda_(nt))^2);
                     Mesh(~mod)=0.;
                 else
                     mod =  illu_(nt);
                 end
                 switch  this.type
                     case  this.PUPIL % pupil
-                        ephi_(:,:,nt) = mod.*(Mesh<=(this.NA/  this.lambda(nt))^2);
+                        ephi_(:,:,nt) = mod.*(Mesh<=(this.NA/  lambda_(nt))^2);
                     case  this.AS % Angular spectrum
-                        ephi_(:,:,nt) =  mod.*exp(-2i* pi *   this.z(nt).* sqrt((   this.n0/  this.lambda(nt))^2- Mesh));
+                        ephi_(:,:,nt) =  mod.*exp(-2i* pi *   z_(nt).* sqrt((   n0_/  lambda_(nt))^2- Mesh));
                     case  this.FEITFLECK
-                        ephi_(:,:,nt)=  mod.*exp(-2i* pi *  this.z(nt).* this.lambda(nt) /  this.n0 * Mesh ./ real(1 + sqrt(1 - ( this.lambda(nt)/ this.n0)^2 *Mesh)));
+                        ephi_(:,:,nt)=  mod.*exp(-2i* pi *  z_(nt).* lambda_(nt) /  n0_ * Mesh ./ real(1 + sqrt(1 - ( lambda_(nt)/ n0_)^2 *Mesh)));
                     otherwise
                         % separable Fresnel function
-                        ephi_(:,:,nt) =mod.* exp(-1i* pi *   this.z(nt).*  this.lambda(nt) /  this.n0 .*Mesh);
+                        ephi_(:,:,nt) =mod.* exp(-1i* pi *   z_(nt).*  lambda_(nt) /  n0_ .*Mesh);
                 end
             end
             this.ephi = ephi_;
