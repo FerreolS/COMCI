@@ -8,7 +8,8 @@ classdef LinOpPropagatorH <  LinOp
     %    :param      z:   array of T depth of propagation  [m]
     %    :param    dxy:   pixel size (width=lenght =dxy)   [m]
     %    :param  theta:   array of [2 T] illumination angle in radian
-    %    :param   illu:   array of T mean amplitude of the illumination per hologram 
+    %    :param   fourierWeight:   array of [sizeout] for an extra filtering in Fourier to model the finite coherence,
+    %                              can also be an array of T mean amplitude of the illumination per hologram
     %    :param   type:   type of the proagation model can be:
     %                      'Fresnel' (default)
     %                      'FeitFleck' use the Feit and Fleck model (M. D. Feit and J. A. Fleck, ?Bean nonparaxiality, filament formaform, and beam breakup in the self-focusing of optical beams,? J. Opt. Soc. Am. B, vol. 5, pp. 633? 640, March 1988.)
@@ -50,10 +51,8 @@ classdef LinOpPropagatorH <  LinOp
     properties (SetAccess = protected,GetAccess = public)
         Nx      % number of pixels along X
         Ny      % number of pixels along Y
-        Nt      % number of angle
-        ephi       % Fresnel function
-        sizeinC;
-        sizeoutC;
+        Nt      % number of illumination frame
+        ephi    % Fresnel function
         
     end
     
@@ -65,11 +64,11 @@ classdef LinOpPropagatorH <  LinOp
         dxy     % pixel size            [m]
         theta   % tilt angle
         NA =  1;% numerical aperture (if needed)
-        illu=1; %illumination
+        fourierWeight =1; %  weight in Fourier space (eg attenuation given by the finite coherence)
         N       % number of pixel
     end
     methods
-        function this = LinOpPropagatorH(sz,lambda, n0, z,dxy, theta, illu,varargin)
+        function this = LinOpPropagatorH(sz,lambda, n0, z,dxy, theta,fourierWeight,varargin)
             
             this.name ='LinOpPropagatorH';
             
@@ -89,8 +88,6 @@ classdef LinOpPropagatorH <  LinOp
             this.Nt = max([numel(theta)/2,numel(lambda),numel(z)]);
             this.sizein = sz ;
             this.sizeout = [sz this.Nt];
-            this.sizeinC = this.sizein;
-            this.sizeoutC = this.sizeout;
             
             this.Nx = sz(1);
             this.Ny = sz(2);
@@ -98,7 +95,7 @@ classdef LinOpPropagatorH <  LinOp
             
             this.N = prod(sz);
             
-            this.illu = illu;
+            this.fourierWeight = fourierWeight;
             for c=1:length(varargin)
                 switch varargin{c}
                     case('Pupil')
@@ -118,13 +115,13 @@ classdef LinOpPropagatorH <  LinOp
     end
     methods  (Access = protected)
         function y = apply_(this,x)
-            y = zeros(this.sizeoutC);
+            y = zeros(this.sizeout);
             for nt = 1:this.Nt
                 y(:,:,nt) = ifft2( this.ephi(:,:,nt) .*  x);
             end
         end
         function y = applyAdjoint_(this,x)
-            y = zeros(this.sizeinC);
+            y = zeros(this.sizein);
             for nt = 1:this.Nt
                 y = y+    conj(this.ephi(:,:,nt)) .*  fft2(x(:,:,nt));
             end
@@ -136,16 +133,16 @@ classdef LinOpPropagatorH <  LinOp
         end
         function M = makeHtH_(this)
             % Reimplemented from parent class :class:`LinOp`.
-            re = real(this.ephi).^2 + imag(this.ephi).^2;
+            m = real(this.ephi).^2 + imag(this.ephi).^2;
             
-            M=LinOpDiag(this.sizein,sum(re,3)./(this.N) );
+            M=LinOpDiag(this.sizein,sum(m,3)./(this.N) );
         end
     end
     
     methods (Access = private)
         function update(this,~,~)
             
-            ephi_ = zeros(this.sizeoutC);
+            ephi_ = zeros(this.sizeout);
             Nx_ = this.Nx;
             Ny_ = this.Ny;
             dxy_ = this.dxy;
@@ -154,10 +151,12 @@ classdef LinOpPropagatorH <  LinOp
             lambda_ = this.lambda.*ones(1,this.Nt);
             z_ = this.z.*ones(1,this.Nt);
             
-            if numel(this.illu)==1
-                illu_ = this.illu.*ones(1, this.Nt);
+            if numel(this.fourierWeight)==1  || numel(this.fourierWeight)==this.Nt
+                fourierWeight_ = this.fourierWeight.*ones(1,1, this.Nt);
+            elseif cmpSize(this.sizeout, size(this.fourierWeight))
+                fourierWeight_ = this.fourierWeight;
             else
-                illu_ = this.illu;
+                error('fourierWeight does not have the right size');
             end
             
             for nt = 1:this.Nt
@@ -170,10 +169,10 @@ classdef LinOpPropagatorH <  LinOp
                 Mesh = mv + mu;
                 
                 if (max(Mesh(:))>( n0_/  lambda_(nt))^2)
-                    mod = illu_(nt).* (Mesh<= ( n0_/  lambda_(nt))^2);
+                    mod = fourierWeight_(:,:,nt).* (Mesh<= ( n0_/  lambda_(nt))^2);
                     Mesh(~mod)=0.;
                 else
-                    mod =  illu_(nt);
+                    mod =  fourierWeight_(:,:,nt);
                 end
                 switch  this.type
                     case  this.PUPIL % pupil

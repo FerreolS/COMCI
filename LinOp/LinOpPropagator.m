@@ -12,6 +12,7 @@ classdef LinOpPropagator <  LinOp
     %  :param dxy:      pixel size            [m]
     %  :param theta:    incidence angle along x and y. It is a vector [2  Nt] where Nt is the number of incidence angles.
     %  :param illu:     the illumination wave in the sample plane. It can be as scalar for uniform illumination, a vector [1 Nt] for a different but uniform illumination at each incidence angle or a (complex) vector [sz Nt] for a random illumination
+    %  :param fourierWeight:   array of [sizeout] for an extra filtering in Fourier to model the finite coherence,
     %  :param type:     model of the diffraction pattern. It can be either:
     %                        * 'Fresnel' for Fresnel method (in Fourier domain)
     %                        * 'AS'      for Angular Spectrum method
@@ -46,12 +47,13 @@ classdef LinOpPropagator <  LinOp
         Ny      % number of pixels along Y
         Nt      % number of angle
         ephi       % Fresnel function
-        sizeinC;
-        sizeoutC;
-        unifInten = true;
-        modulus;
+        unifIllu = true; % true if the illumination intensity is uniform
+        unifFourier =  true % true if the kernel has a unit modulus
+        fourierWeight =1; %  weight in Fourier space (eg attenuation given by the finite coherence)
+        N       % number of pixel
+                scale;  % global illumination scale per hologram
+        
     end
-    
     properties (SetObservable)
         type = 0;
         illu;
@@ -63,7 +65,7 @@ classdef LinOpPropagator <  LinOp
         NA =  1;% numerical aperture (if needed)
     end
     methods
-        function this = LinOpPropagator(sz,lambda, n0, z,dxy,theta, illu,varargin)
+        function this = LinOpPropagator(sz,lambda, n0, z,dxy,theta, illu,fourierWeight,varargin)
             
             this.name ='LinOpPropagator';
             
@@ -83,13 +85,13 @@ classdef LinOpPropagator <  LinOp
             this.Nt = max([numel(theta)/2,numel(lambda),numel(z)]);
             this.sizein = sz ;
             this.sizeout = [sz this.Nt];
-            this.sizeinC = this.sizein;
-            this.sizeoutC = this.sizeout;
             
             this.Nx = sz(1);
             this.Ny = sz(2);
+            this.N = prod(sz);
+            this.scale=ones(1,1 , this.Nt);
             
-            
+            this.fourierWeight = fourierWeight;
             this.illu = illu;
             for c=1:length(varargin)
                 switch varargin{c}
@@ -107,34 +109,50 @@ classdef LinOpPropagator <  LinOp
             
             this.update();
             
+            
             addlistener(this,{'theta','z','lambda','type','n0','NA','dxy','illu'},'PostSet',@this.update);
             
+%             if this.Nt ==1
+%                 this = LinOpConv(squeeze(this.scale.*this.ephi))*LinOpDiag(this.sizein, squeeze(this.illu));
+%             end
         end
     end
     methods  (Access = protected)
         function y = apply_(this,x)
-            y = zeros(this.sizeoutC);
+            y = zeros(this.sizeout);
             
             for nt = 1:this.Nt
                 fx = fft2(this.illu(:,:,nt).*x);
-                y(:,:,nt) = ifft2( this.ephi(:,:,nt) .*  fx);
+                y(:,:,nt) = this.scale(nt).*ifft2( this.ephi(:,:,nt) .*  fx);
             end
         end
         function y = applyAdjoint_(this,x)
-            y = zeros(this.sizeinC);
+            y = zeros(this.sizein);
             for nt = 1:this.Nt
-                y = y+ conj(this.illu(:,:,nt)).*  ifft2( conj(this.ephi(:,:,nt)) .*  fft2(x(:,:,nt)));
+                y = y+ this.scale(nt).*conj(this.illu(:,:,nt)).*  ifft2( conj(this.ephi(:,:,nt)) .*  fft2(x(:,:,nt)));
             end
             
         end
         function y = applyHtH_(this, x)
-            
-                 y = x.* sum(abs(this.illu).^2,3);
-        end        
+            if this.unifFourier
+                y = x.* sum(abs(this.illu).^2,3).*mean(this.scale(:).^2);
+            elseif this.unifIllu
+                m = real(this.ephi).^2 + imag(this.ephi).^2;
+                y =ifftn(sum(m,3).*mean(this.scale(:).^2).*fftn(x));
+            else
+                y= applyHtH_@LinOp(this,x);
+            end
+        end
         function M = makeHtH_(this)
             % Reimplemented from parent class :class:`LinOp`.
-            
-            M=LinOpDiag(this.sizein,sum(abs(this.illu).^2,3));
+            if this.unifFourier
+                M=LinOpDiag(this.sizein,sum(abs(this.illu).^2,3) .*mean(this.scale(:).^2));
+            elseif this.unifIllu
+                m = real(this.ephi).^2 + imag(this.ephi).^2;
+                M=LinOpConv(sum(m,3).*mean(this.scale(:).^2),false );
+            else
+                M=     makeHtH_@LinOp(this);
+            end
         end
     end
     methods (Access = private)
@@ -149,16 +167,53 @@ classdef LinOpPropagator <  LinOp
             z_ = this.z.*ones(1,this.Nt);
             
             
-            this.unifInten =  true;
+            
+            % Fourier Weight
+            if isscalar(this.fourierWeight) || numel(this.fourierWeight)==this.Nt
+                fourierWeight_ = ones(1,1, this.Nt);
+                this.scale = this.scale.*this.fourierWeight(:);
+                this.fourierWeight = 1;
+            elseif cmpSize(this.sizeout, size(this.fourierWeight))
+                fourierWeight_ = this.fourierWeight;
+                for nt = 1:this.Nt
+                    tmp = abs(this.fourierWeight(:,:,nt));
+                    if( length(unique( tmp(:)))~=1)
+                        this.unifFourier =  false;
+                        break;
+                    end
+                end
+            else
+                error('fourierWeight does not have the right size');
+            end
+            
+            
+            % Illumination
+            this.unifIllu =  true;
+            if isscalar(this.illu) || (numel(this.illu)==this.Nt)
+                this.scale = this.scale.* this.illu(:);
+                this.illu =  ones([1,1,this.Nt]);
+            elseif cmpSize(this.sizeout, size(this.illu))
+                for nt = 1:this.Nt
+                    tmp = abs(this.illu(:,:,nt));
+                    if( length(unique( tmp(:)))~=1)
+                        this.unifIllu =  false;
+                        break;
+                    else
+                        this.scale(nt) = tmp;
+                        this.illu(:,:,nt) = this.illu(:,:,nt) ./tmp;
+                    end
+                end
+            else
+                error('illu does not have the right size');
+            end
+            
+            
+            
             
             % propagation kernel
-            ephi_ = zeros(this.sizeoutC);
+            ephi_ = zeros(this.sizeout);
             
-            if this.type==this.PUPIL
-                mod = ones([this.sizein, this.Nt]);
-            else
-                mod = zeros([1,1,this.Nt]);
-            end
+            
             for nt = 1:this.Nt
                 %  frequency grid
                 v = 1./(Nx_ * dxy_) *( [0:ceil( Nx_/2)-1, -floor( Nx_/2):-1]' -   dxy_ *   sin(theta_(1,nt))/lambda_(nt).*Nx_);
@@ -168,51 +223,31 @@ classdef LinOpPropagator <  LinOp
                 [mu,mv] =  meshgrid(  u.^2,  v.^2);
                 Mesh = mv + mu;
                 
-                if this.type~=this.PUPIL
-                    if (max(Mesh(:))>(n0_/ lambda_(nt))^2)
-                        if isequal(size(mod),[1,1,this.Nt])
-                            mod = ones([this.sizein this.Nt]);
-                        end
-                        mod(:,:,nt) =  (Mesh<= (n0_/ lambda_(nt))^2);
-                        Mesh(~mod(:,:,nt))=0.;
-                        this.unifInten =  false;
-                    else
-                        mod(:,:,nt) = 1;
-                    end
+                if (max(Mesh(:))>(n0_/ lambda_(nt))^2)
+                    mod  =  fourierWeight_(:,:,nt).*(Mesh<= (n0_/ lambda_(nt))^2);
+                    Mesh(~mod )=0.;
+                    this.unifFourier =  false;
+                else
+                    mod = fourierWeight_(:,:,nt);
                 end
                 
                 switch  this.type
                     case  this.PUPIL % pupil
-                        mod(:,:,nt) = (Mesh<=(this.NA/ lambda_(nt))^2);
-                        ephi_(:,:,nt) = mod(:,:,nt);
-                        this.unifInten =  false;
+                        ephi_(:,:,nt) = mod.*(Mesh<=(this.NA/ lambda_(nt))^2);
+                        this.unifFourier =  false;
                     case  this.AS % Angular spectrum
-                        ephi_(:,:,nt) =  mod(:,:,nt).*exp(-2i* pi *  z_(nt).* sqrt((  n0_/ lambda_(nt))^2- Mesh));
+                        ephi_(:,:,nt) =  mod.*exp(-2i* pi *  z_(nt).* sqrt((  n0_/ lambda_(nt))^2- Mesh));
                     case  this.FEITFLECK
-                        ephi_(:,:,nt)=  mod(:,:,nt).*exp(-2i* pi * z_(nt).*lambda_(nt) / n0_ * Mesh ./ real(1 + sqrt(1 - (lambda_(nt)/n0_)^2 *Mesh)));
+                        ephi_(:,:,nt)=  mod.*exp(-2i* pi * z_(nt).*lambda_(nt) / n0_ * Mesh ./ real(1 + sqrt(1 - (lambda_(nt)/n0_)^2 *Mesh)));
                     otherwise
                         %  Fresnel function
-                        ephi_(:,:,nt) =mod(:,:,nt).* exp(-1i* pi *  z_(nt).* lambda_(nt) / n0_ .*Mesh);
+                        ephi_(:,:,nt) =mod.* exp(-1i* pi *  z_(nt).* lambda_(nt) / n0_ .*Mesh);
                 end
             end
             this.ephi = ephi_;
-            this.modulus = mod.^2;
-            
-            % Illumination
-            
-            if isscalar(this.illu) || (numel(this.illu)==this.Nt)
-                this.illu =  ones([1,1,this.Nt]).*this.illu;
-            elseif this.unifInten
-                for nt = 1:this.Nt
-                    tmp = abs(this.illu(:,:,nt));
-                    if( length(unique( tmp(:)))~=1)
-                        this.unifInten =  false;
-                        break;
-                    end
-                end
-            end
             
             
+            this.norm=max(this.scale(nt).*abs(this.ephi(:)));
         end
     end
 end
