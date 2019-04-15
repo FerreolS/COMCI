@@ -2,13 +2,13 @@ classdef LinOpPropagator <  LinOp
     %% LinOpPropagator: propagation operator
     %  Propagation linear operator that model the scalar propagation of coherent light through an homogene medium
     %
-    % Example
-    % Obj = LinOpPropagator(sz,lambda, n0, z,dxy, theta, illu,type,NA)
-    % Fresnel transform operator with
     %  :param sz:       size of the input
-    %  :param lambda:   wavelenght [m]
-    %  :param n0:       refractive index of the medium
-    %  :param z:        depth of propagation  [m]
+    %  :param lambda:   wavelenght [m] can be a scalar or
+    %                   a vector of size [2  Nt] where Nt is the number image.
+    %  :param n0:       refractive index of the medium can be a scalar or
+    %                   a vector of size [2  Nt] where Nt is the number image.
+    %  :param z:        depth of propagation vector  [m] can be a scalar or
+    %                   a vector of size [2  Nt] where Nt is the number image.
     %  :param dxy:      pixel size            [m]
     %  :param theta:    incidence angle along x and y. It is a vector [2  Nt] where Nt is the number of incidence angles.
     %  :param illu:     the illumination wave in the sample plane. It can be as scalar for uniform illumination, a vector [1 Nt] for a different but uniform illumination at each incidence angle or a (complex) vector [sz Nt] for a random illumination
@@ -19,9 +19,13 @@ classdef LinOpPropagator <  LinOp
     %                        * 'FeitFleck' for the Feit and Fleck model   (M. D. Feit and J. A. Fleck, ?Bean nonparaxiality, filament formaform, and beam breakup in the self-focusing of optical beams,? J. Opt. Soc. Am. B, vol. 5, pp. 633? 640, March 1988.)
     %                        * 'Pupil'   for propagation through an objective with from the focal plane to the detector plane. In that case the next argument is :param NA: the numerical apperture.
     %
+    %  All attributes of parent class :class:`LinOp` are inherited.
+    %
+    %  **Example**  H = LinOpPropagator(sz,lambda, n0, z,dxy, theta, illu,type,NA)
+    %
     % See also :class:`LinOp`, :class:`Map`
     
-    %     Copyright (C) 2018 F. Soulez ferreol.soulez@epfl.ch
+    %     Copyright (C) 2018 F. Soulez ferreol.soulez@univ-lyon1.fr
     %
     %     This program is free software: you can redistribute it and/or modify
     %     it under the terms of the GNU General Public License as published by
@@ -43,7 +47,7 @@ classdef LinOpPropagator <  LinOp
         FRESNEL = 0
     end
     properties (SetAccess = protected,GetAccess = public)
-        Nx      % number of pixels along X
+        Nx      % number of pixels along X            
         Ny      % number of pixels along Y
         Nt      % number of angle
         ephi       % Fresnel function
@@ -51,7 +55,7 @@ classdef LinOpPropagator <  LinOp
         unifFourier =  true % true if the kernel has a unit modulus
         fourierWeight =1; %  weight in Fourier space (eg attenuation given by the finite coherence)
         N       % number of pixel
-                scale;  % global illumination scale per hologram
+        scale;  % global illumination scale per hologram
         
     end
     properties (SetObservable)
@@ -80,7 +84,7 @@ classdef LinOpPropagator <  LinOp
             this.dxy = dxy;
             
             assert(issize(sz) && (length(sz)==2),'The input size sz should be a conformable  to size(2D) ');
-            
+
             this.theta = theta;
             this.Nt = max([numel(theta)/2,numel(lambda),numel(z)]);
             this.sizein = sz ;
@@ -102,6 +106,10 @@ classdef LinOpPropagator <  LinOp
                         this.type = this.FEITFLECK;
                     case('AS')
                         this.type = this.AS;
+                    case('Fresnel')
+                        this.type = this.FRESNEL;
+                    otherwise
+                        error('Type of propagation must be defined');
                 end
             end
             
