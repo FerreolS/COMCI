@@ -1,0 +1,3 @@
+SVG to PNG
+ppp=2482  -> 1px = 65nm
+pngtopnm -alpha USAF-1951_65nm_tilt_B.png | pnmtopng > USAF-1951_65nm_tilt_C.png
