@@ -1,4 +1,11 @@
 *~
+*.xml
+*.png
+*.mat
+*.tif*
+*.jpg
+*.jpeg
+*.tar*
 *.mex*
 *html/
 *doctrees/
