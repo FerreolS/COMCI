@@ -16,6 +16,8 @@ classdef LinOpPropagator <  LinOp
     %  :param type:     model of the diffraction pattern. It can be either:
     %                        * 'Fresnel' for Fresnel method (in Fourier domain)
     %                        * 'AS'      for Angular Spectrum method
+    %                        * 'BLAS'    for Band Limited Angular Spectrum (Matsushima, K., & Shimobaba, T. (2009).   Band-limited angular spectrum method for numerical simulation of free-space propagation in far and near fields. Optics express, 17(22), 19662-19673.)
+    %                        * 'BLAS2'   idem Yu, X., Xiahui, T., Yingxiong, Q., Hao, P., & Wei, W. (2012). Band-limited angular spectrum numerical propagation method with selective scaling of observation window size and sample number. JOSA A, 29(11), 2415-2420.
     %                        * 'FeitFleck' for the Feit and Fleck model   (M. D. Feit and J. A. Fleck, ?Bean nonparaxiality, filament formaform, and beam breakup in the self-focusing of optical beams,? J. Opt. Soc. Am. B, vol. 5, pp. 633? 640, March 1988.)
     %                        * 'Pupil'   for propagation through an objective with from the focal plane to the detector plane. In that case the next argument is :param NA: the numerical apperture.
     %
@@ -44,7 +46,10 @@ classdef LinOpPropagator <  LinOp
         PUPIL = 3   % Fresnel propagation through an objective of pupil of radius R
         FEITFLECK = 2
         AS = 1 % Use Angular Spectrum method
+        BLAS = 4; % Band limited AS (
+        BLAS2 = 5;
         FRESNEL = 0
+        
     end
     properties (SetAccess = protected,GetAccess = public)
         Nx      % number of pixels along X            
@@ -106,6 +111,10 @@ classdef LinOpPropagator <  LinOp
                         this.type = this.FEITFLECK;
                     case('AS')
                         this.type = this.AS;
+                    case('BLAS')
+                        this.type = this.BLAS;
+                    case('BLAS2')
+                        this.type = this.BLAS2;
                     case('Fresnel')
                         this.type = this.FRESNEL;
                     otherwise
@@ -120,9 +129,6 @@ classdef LinOpPropagator <  LinOp
             
             addlistener(this,{'theta','z','lambda','type','n0','NA','dxy','illu'},'PostSet',@this.update);
             
-%             if this.Nt ==1
-%                 this = LinOpConv(squeeze(this.scale.*this.ephi))*LinOpDiag(this.sizein, squeeze(this.illu));
-%             end
         end
     end
     methods  (Access = protected)
@@ -169,6 +175,9 @@ classdef LinOpPropagator <  LinOp
             Nx_ = this.Nx;
             Ny_ = this.Ny;
             dxy_ = this.dxy;
+            if this.Nt==1 && size(this.theta,1)==1
+                this.theta = this.theta';
+            end
             theta_ = this.theta.*ones(2,this.Nt);
             n0_ = this.n0;
             lambda_ = this.lambda.*ones(1,this.Nt);
@@ -217,11 +226,10 @@ classdef LinOpPropagator <  LinOp
             
             
             
-            
             % propagation kernel
             ephi_ = zeros(this.sizeout);
             
-            
+            L = Nx_* dxy_/2;
             for nt = 1:this.Nt
                 %  frequency grid
                 v = 1./(Nx_ * dxy_) *( [0:ceil( Nx_/2)-1, -floor( Nx_/2):-1]' -   dxy_ *   sin(theta_(1,nt))/lambda_(nt).*Nx_);
@@ -230,20 +238,36 @@ classdef LinOpPropagator <  LinOp
                 
                 [mu,mv] =  meshgrid(  u.^2,  v.^2);
                 Mesh = mv + mu;
-                
-                if (max(Mesh(:))>(n0_/ lambda_(nt))^2)
-                    mod  =  fourierWeight_(:,:,nt).*(Mesh<= (n0_/ lambda_(nt))^2);
-                    Mesh(~mod )=0.;
-                    this.unifFourier =  false;
+                if this.type==this.BLAS
+                    Q = (L/sqrt(L^2+z_(nt)^2) *n0_/ lambda_(nt))^2;
+                    if (max(Mesh(:))>Q)
+                        mod  =  fourierWeight_(:,:,nt).*(mv<= Q*(1-mu* (lambda_(nt)^2))).*(mu<= Q*(1-mv* (lambda_(nt)^2)));
+                        Mesh(~mod )=0.;
+                        this.unifFourier =  false;
+                    else
+                        mod = fourierWeight_(:,:,nt);
+                    end
                 else
-                    mod = fourierWeight_(:,:,nt);
+                    if this.type==this.BLAS2
+                        Q = (L/sqrt(L^2+z_(nt)^2) *n0_/ lambda_(nt))^2;
+                    else
+                        Q=(n0_/ lambda_(nt))^2;
+                    end
+                    if (max(Mesh(:))>Q)
+                        mod  =  fourierWeight_(:,:,nt).*(Mesh<= Q);
+                        Mesh(~mod )=0.;
+                        this.unifFourier =  false;
+                    else
+                        mod = fourierWeight_(:,:,nt);
+                    end
                 end
+                clear mv mu;
                 
                 switch  this.type
                     case  this.PUPIL % pupil
                         ephi_(:,:,nt) = mod.*(Mesh<=(this.NA/ lambda_(nt))^2);
                         this.unifFourier =  false;
-                    case  this.AS % Angular spectrum
+                    case  {this.AS,this.BLAS} % Angular spectrum
                         ephi_(:,:,nt) =  mod.*exp(-2i* pi *  z_(nt).* sqrt((  n0_/ lambda_(nt))^2- Mesh));
                     case  this.FEITFLECK
                         ephi_(:,:,nt)=  mod.*exp(-2i* pi * z_(nt).*lambda_(nt) / n0_ * Mesh ./ real(1 + sqrt(1 - (lambda_(nt)/n0_)^2 *Mesh)));
