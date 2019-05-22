@@ -1,7 +1,8 @@
+
 PSpatCoherence = 0;
 
 nbi=1;
-for nb = nbi:80
+for nb = nbi:10
     nb
     switch randi(5,1)
         case 1
@@ -20,7 +21,7 @@ for nb = nbi:80
    truth= circshift(truth,cshift);
    TestSpatialCoherence;
    PSpatCoherence = PSpatCoherence + PSNR;
-   save('TestSpatialCoherence_Disk_x100.mat','nb','P1','PSNR','IncidenceA','SNR','wdSz','lambda','k','z','n0','dxy');
+   save('TestSpatialCoherence_Disk_x100.mat','nb','PSNR','IncidenceA','SNR','wdSz','lambda','k','z','n0','dxy','PSpatCoherence');
 end
 
 
