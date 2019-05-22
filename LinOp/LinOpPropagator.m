@@ -267,8 +267,8 @@ classdef LinOpPropagator <  LinOp
                     case  this.PUPIL % pupil
                         ephi_(:,:,nt) = mod.*(Mesh<=(this.NA/ lambda_(nt))^2);
                         this.unifFourier =  false;
-                    case  {this.AS,this.BLAS} % Angular spectrum
-                        ephi_(:,:,nt) =  mod.*exp(-2i* pi *  z_(nt).* sqrt((  n0_/ lambda_(nt))^2- Mesh));
+                    case  {this.AS,this.BLAS,this.BLAS2} % Angular spectrum
+                        ephi_(:,:,nt) =  mod.*exp(2i* pi *  z_(nt).* sqrt((  n0_/ lambda_(nt))^2- Mesh));
                     case  this.FEITFLECK
                         ephi_(:,:,nt)=  mod.*exp(-2i* pi * z_(nt).*lambda_(nt) / n0_ * Mesh ./ real(1 + sqrt(1 - (lambda_(nt)/n0_)^2 *Mesh)));
                     otherwise
