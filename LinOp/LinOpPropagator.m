@@ -52,7 +52,7 @@ classdef LinOpPropagator <  LinOp
         
     end
     properties (SetAccess = protected,GetAccess = public)
-        Nx      % number of pixels along X            
+        Nx      % number of pixels along X
         Ny      % number of pixels along Y
         Nt      % number of angle
         ephi       % Fresnel function
@@ -61,7 +61,8 @@ classdef LinOpPropagator <  LinOp
         fourierWeight =1; %  weight in Fourier space (eg attenuation given by the finite coherence)
         N       % number of pixel
         scale;  % global illumination scale per hologram
-        
+        PhRampV;
+        PhRampU;
     end
     properties (SetObservable)
         type = 0;
@@ -72,7 +73,9 @@ classdef LinOpPropagator <  LinOp
         dxy     % pixel size            [m]
         theta   % tilt angle
         NA =  1;% numerical aperture (if needed)
+        PhaseCorrect= false
     end
+    
     methods
         function this = LinOpPropagator(sz,lambda, n0, z,dxy,theta, illu,fourierWeight,varargin)
             
@@ -89,7 +92,7 @@ classdef LinOpPropagator <  LinOp
             this.dxy = dxy;
             
             assert(issize(sz) && (length(sz)==2),'The input size sz should be a conformable  to size(2D) ');
-
+            
             this.theta = theta;
             this.Nt = max([numel(theta)/2,numel(lambda),numel(z)]);
             this.sizein = sz ;
@@ -117,6 +120,8 @@ classdef LinOpPropagator <  LinOp
                         this.type = this.BLAS2;
                     case('Fresnel')
                         this.type = this.FRESNEL;
+                    case('PhaseCorrect')
+                        this.PhaseCorrect=true;
                     otherwise
                         error('Type of propagation must be defined');
                 end
@@ -127,7 +132,7 @@ classdef LinOpPropagator <  LinOp
             this.update();
             
             
-            addlistener(this,{'theta','z','lambda','type','n0','NA','dxy','illu'},'PostSet',@this.update);
+            addlistener(this,{'theta','z','lambda','type','n0','NA','dxy','illu','PhaseCorrect'},'PostSet',@this.update);
             
         end
     end
@@ -137,7 +142,11 @@ classdef LinOpPropagator <  LinOp
             
             for nt = 1:this.Nt
                 fx = fft2(this.illu(:,:,nt).*x);
-                y(:,:,nt) = this.scale(nt).*ifft2( this.ephi(:,:,nt) .*  fx);
+                if this.PhaseCorrect
+                    y(:,:,nt) = this.scale(nt).*this.PhRampV(:,nt)'.*this.PhRampU(:,nt).*ifft2( this.ephi(:,:,nt) .*  fx);
+                else
+                    y(:,:,nt) = this.scale(nt).*ifft2( this.ephi(:,:,nt) .*  fx);
+                end
             end
         end
         function y = applyAdjoint_(this,x)
@@ -163,9 +172,9 @@ classdef LinOpPropagator <  LinOp
                 M=LinOpDiag(this.sizein,sum(abs(this.illu).^2,3) .*mean(this.scale(:).^2));
             elseif this.unifIllu
                 m = real(this.ephi).^2 + imag(this.ephi).^2;
-                M=LinOpConv(sum(m,3).*mean(this.scale(:).^2),false );
+                M= LinOpConv(sum(m,3).*mean(this.scale(:).^2),false );
             else
-                M=     makeHtH_@LinOp(this);
+                M= makeHtH_@LinOp(this);
             end
         end
     end
@@ -228,7 +237,10 @@ classdef LinOpPropagator <  LinOp
             
             % propagation kernel
             ephi_ = zeros(this.sizeout);
-            
+            if this.PhaseCorrect
+                this.PhRampV = zeros(Nx_,this.Nt);
+                this.PhRampU = zeros(Ny_,this.Nt);
+            end
             L = Nx_* dxy_/2;
             for nt = 1:this.Nt
                 %  frequency grid
@@ -275,11 +287,18 @@ classdef LinOpPropagator <  LinOp
                         %  Fresnel function
                         ephi_(:,:,nt) =mod.* exp(-1i* pi *  z_(nt).* lambda_(nt) / n0_ .*Mesh);
                 end
+                
+                this.ephi = ephi_;
+                
+                
+                this.norm=max(this.scale(nt).*abs(this.ephi(:)));
+                
+                
+                if this.PhaseCorrect
+                    this.PhRampV(:,nt) = exp( (2.i * pi *dxy_ *   sin(theta_(1,nt))/lambda_(nt)) .* (1:Nx_));
+                    this.PhRampU(:,nt) = exp( (2.i * pi *dxy_ *   sin(theta_(2,nt))/lambda_(nt)) .* (1:Ny_));
+                end
             end
-            this.ephi = ephi_;
-            
-            
-            this.norm=max(this.scale(nt).*abs(this.ephi(:)));
         end
     end
 end
