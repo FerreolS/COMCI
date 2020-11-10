@@ -11,7 +11,7 @@ classdef LinOpPropagator <  LinOp
     %                   a vector of size [2  Nt] where Nt is the number image.
     %  :param dxy:      pixel size            [m]
     %  :param theta:    incidence angle along x and y. It is a vector [2  Nt] where Nt is the number of incidence angles.
-    %  :param illu:     the illumination wave in the sample plane. It can be as scalar for uniform illumination, a vector [1 Nt] for a different but uniform illumination at each incidence angle or a (complex) vector [sz Nt] for a random illumination
+    %  :param illu:     the illumination wave in the sample plane. It can be a scalar for uniform illumination, a vector [1 Nt] for a different but uniform illumination at each incidence angle or a (complex) vector [sz Nt] for a random illumination
     %  :param fourierWeight:   array of [sizeout] for an extra filtering in Fourier to model the finite coherence,
     %  :param type:     model of the diffraction pattern. It can be either:
     %                        * 'Fresnel' for Fresnel method (in Fourier domain)
@@ -20,6 +20,7 @@ classdef LinOpPropagator <  LinOp
     %                        * 'BLAS2'   idem Yu, X., Xiahui, T., Yingxiong, Q., Hao, P., & Wei, W. (2012). Band-limited angular spectrum numerical propagation method with selective scaling of observation window size and sample number. JOSA A, 29(11), 2415-2420.
     %                        * 'FeitFleck' for the Feit and Fleck model   (M. D. Feit and J. A. Fleck, ?Bean nonparaxiality, filament formaform, and beam breakup in the self-focusing of optical beams,? J. Opt. Soc. Am. B, vol. 5, pp. 633? 640, March 1988.)
     %                        * 'Pupil'   for propagation through an objective with from the focal plane to the detector plane. In that case the next argument is :param NA: the numerical apperture.
+    %  :param PhaseCorrect if the keyword 'PhaseCorrect' is set, the output will be modulated by exp(1I sin(theta)/lambda) due to the tilted incidence. This therm is usually not needed as it vanished from the intensity
     %  :param oversample if the keyword 'oversample' is set, the propagation is oversampled by a factor 2 to prevent aliasing in subsequent intensity estimation. The output size will be twice the input size.
     %  
     %
@@ -134,14 +135,10 @@ classdef LinOpPropagator <  LinOp
                         error('Type of propagation must be defined');
                 end
             end
-            
-            
-            
+                       
             this.update();
-            
-            
-            addlistener(this,{'theta','z','lambda','type','n0','NA','dxy','illu','PhaseCorrect'},'PostSet',@this.update);
-            
+                    
+            addlistener(this,{'theta','z','lambda','type','n0','NA','dxy','illu','PhaseCorrect'},'PostSet',@this.update);            
         end
     end
     methods  (Access = protected)
@@ -202,9 +199,7 @@ classdef LinOpPropagator <  LinOp
             Nx_ = this.Nx;
             Ny_ = this.Ny;
             dxy_ = this.dxy;
-            if this.Nt==1 && size(this.theta,1)==1
-                this.theta = this.theta';
-            end
+            
             theta_ = this.theta.*ones_(2,this.Nt);
             n0_ = this.n0;
             lambda_ = this.lambda.*ones_(1,this.Nt);
@@ -310,11 +305,10 @@ classdef LinOpPropagator <  LinOp
                         ephi_(:,:,nt) =mod.* exp(-1i* pi *  z_(nt).* lambda_(nt) / n0_ .*Mesh);
                 end
                 
-                this.ephi = ephi_;
                 
-                
-                this.norm=max(this.scale(nt).*abs(this.ephi(:)));
-                
+                if this.unifIllu
+                    this.norm=max(max(this.scale(nt).*abs(ephi_(:))),this.norm);
+                end
                 
                 if this.PhaseCorrect
                     if this.oversample
@@ -326,6 +320,7 @@ classdef LinOpPropagator <  LinOp
                     end
                 end
             end
+            this.ephi = ephi_;
         end
     end
 end
