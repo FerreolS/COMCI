@@ -1,6 +1,6 @@
 classdef LinOpPropagator <  LinOp
     %% LinOpPropagator: propagation operator
-    %  Propagation linear operator that model the scalar propagation of coherent light through an homogene medium
+    %  Propagation linear operator that models the scalar propagation of coherent light through an homogene medium
     %
     %  :param sz:       size of the input
     %  :param lambda:   wavelenght [m] can be a scalar or
@@ -20,10 +20,12 @@ classdef LinOpPropagator <  LinOp
     %                        * 'BLAS2'   idem Yu, X., Xiahui, T., Yingxiong, Q., Hao, P., & Wei, W. (2012). Band-limited angular spectrum numerical propagation method with selective scaling of observation window size and sample number. JOSA A, 29(11), 2415-2420.
     %                        * 'FeitFleck' for the Feit and Fleck model   (M. D. Feit and J. A. Fleck, ?Bean nonparaxiality, filament formaform, and beam breakup in the self-focusing of optical beams,? J. Opt. Soc. Am. B, vol. 5, pp. 633? 640, March 1988.)
     %                        * 'Pupil'   for propagation through an objective with from the focal plane to the detector plane. In that case the next argument is :param NA: the numerical apperture.
+    %  :param oversample if the keyword 'oversample' is set, the propagation is oversampled by a factor 2 to prevent aliasing in subsequent intensity estimation. The output size will be twice the input size.
+    %  
     %
     %  All attributes of parent class :class:`LinOp` are inherited.
     %
-    %  **Example**  H = LinOpPropagator(sz,lambda, n0, z,dxy, theta, illu,type,NA)
+    %  **Example**  H = LinOpPropagator(sz,lambda, n0, z,dxy, theta, illu,type,NA,oversample)
     %
     % See also :class:`LinOp`, :class:`Map`
     
@@ -63,6 +65,8 @@ classdef LinOpPropagator <  LinOp
         scale;  % global illumination scale per hologram
         PhRampV;
         PhRampU;
+        oversample= false;
+        sizeoutno % sizeout without oversampling
     end
     properties (SetObservable)
         type = 0;
@@ -97,11 +101,12 @@ classdef LinOpPropagator <  LinOp
             this.Nt = max([numel(theta)/2,numel(lambda),numel(z)]);
             this.sizein = sz ;
             this.sizeout = [sz this.Nt];
+            this.sizeoutno = [sz this.Nt];
             
             this.Nx = sz(1);
             this.Ny = sz(2);
             this.N = prod(sz);
-            this.scale=ones(1,1 , this.Nt);
+            this.scale=ones_(1,1 , this.Nt);
             
             this.fourierWeight = fourierWeight;
             this.illu = illu;
@@ -122,6 +127,9 @@ classdef LinOpPropagator <  LinOp
                         this.type = this.FRESNEL;
                     case('PhaseCorrect')
                         this.PhaseCorrect=true;
+                    case('oversample')
+                        this.oversample=true;
+                        this.sizeout = [2.*sz this.Nt];
                     otherwise
                         error('Type of propagation must be defined');
                 end
@@ -138,21 +146,31 @@ classdef LinOpPropagator <  LinOp
     end
     methods  (Access = protected)
         function y = apply_(this,x)
-            y = zeros(this.sizeout);
+            y = zeros_(this.sizeout);
             
             for nt = 1:this.Nt
-                fx = fft2(this.illu(:,:,nt).*x);
-                if this.PhaseCorrect
-                    y(:,:,nt) = this.scale(nt).*this.PhRampV(:,nt)'.*this.PhRampU(:,nt).*ifft2( this.ephi(:,:,nt) .*  fx);
+                fx =this.ephi(:,:,nt) .* fft2(this.illu(:,:,nt).*x);
+                if this.oversample
+                    fx =2.*ifft2(ifftshift( padarray( fftshift(fx),[this.Nx/2, this.Ny/2] )));
                 else
-                    y(:,:,nt) = this.scale(nt).*ifft2( this.ephi(:,:,nt) .*  fx);
+                    fx =ifft2(fx);
+                end
+                if this.PhaseCorrect
+                    y(:,:,nt) = this.scale(nt).*this.PhRampV(:,nt)'.*this.PhRampU(:,nt).*  fx;
+                else
+                    y(:,:,nt) = this.scale(nt).*fx;
                 end
             end
         end
         function y = applyAdjoint_(this,x)
-            y = zeros(this.sizein);
+            y = zeros_(this.sizein);
             for nt = 1:this.Nt
-                y = y+ this.scale(nt).*conj(this.illu(:,:,nt)).*  ifft2( conj(this.ephi(:,:,nt)) .*  fft2(x(:,:,nt)));
+                fx = fft2(x(:,:,nt));
+                if this.oversample
+                    fx = circshift(fx,[this.Nx/2, this.Ny/2] );
+                    fx = 0.5*ifftshift( fx(1:this.Nx, 1:this.Ny));
+                end
+                y = y+ this.scale(nt).*conj(this.illu(:,:,nt)).*  ifft2( conj(this.ephi(:,:,nt)) .* fx);
             end
             
         end
@@ -187,19 +205,19 @@ classdef LinOpPropagator <  LinOp
             if this.Nt==1 && size(this.theta,1)==1
                 this.theta = this.theta';
             end
-            theta_ = this.theta.*ones(2,this.Nt);
+            theta_ = this.theta.*ones_(2,this.Nt);
             n0_ = this.n0;
-            lambda_ = this.lambda.*ones(1,this.Nt);
-            z_ = this.z.*ones(1,this.Nt);
+            lambda_ = this.lambda.*ones_(1,this.Nt);
+            z_ = this.z.*ones_(1,this.Nt);
             
             
             
             % Fourier Weight
             if isscalar(this.fourierWeight) || numel(this.fourierWeight)==this.Nt
-                fourierWeight_ = ones(1,1, this.Nt);
+                fourierWeight_ = ones_(1,1, this.Nt);
                 this.scale = this.scale.*this.fourierWeight(:);
                 this.fourierWeight = 1;
-            elseif cmpSize(this.sizeout, size(this.fourierWeight))
+            elseif cmpSize(this.sizeoutno, size(this.fourierWeight))
                 fourierWeight_ = this.fourierWeight;
                 for nt = 1:this.Nt
                     tmp = abs(this.fourierWeight(:,:,nt));
@@ -217,8 +235,8 @@ classdef LinOpPropagator <  LinOp
             this.unifIllu =  true;
             if isscalar(this.illu) || (numel(this.illu)==this.Nt)
                 this.scale = this.scale.* this.illu(:);
-                this.illu =  ones([1,1,this.Nt]);
-            elseif cmpSize(this.sizeout, size(this.illu))
+                this.illu =  ones_([1,1,this.Nt]);
+            elseif cmpSize(this.sizeoutno, size(this.illu))
                 for nt = 1:this.Nt
                     tmp = abs(this.illu(:,:,nt));
                     if( length(unique( tmp(:)))~=1)
@@ -236,18 +254,22 @@ classdef LinOpPropagator <  LinOp
             
             
             % propagation kernel
-            ephi_ = zeros(this.sizeout);
+            ephi_ = zeros_(this.sizeoutno);
             if this.PhaseCorrect
-                this.PhRampV = zeros(Nx_,this.Nt);
-                this.PhRampU = zeros(Ny_,this.Nt);
+                if this.oversample
+                    this.PhRampV = zeros_(2.*Nx_,this.Nt);
+                    this.PhRampU = zeros_(2.*Ny_,this.Nt);
+                else
+                    this.PhRampV = zeros_(Nx_,this.Nt);
+                    this.PhRampU = zeros_(Ny_,this.Nt);
+                end
             end
             L = Nx_* dxy_/2;
             for nt = 1:this.Nt
                 %  frequency grid
                 v = 1./(Nx_ * dxy_) *( [0:ceil( Nx_/2)-1, -floor( Nx_/2):-1]' -   dxy_ *   sin(theta_(1,nt))/lambda_(nt).*Nx_);
                 u = 1./(Ny_ * dxy_) * ([0:ceil( Ny_/2)-1, -floor( Ny_/2):-1] -    dxy_ *   sin(theta_(2,nt))/lambda_(nt).*Ny_);
-                
-                
+
                 [mu,mv] =  meshgrid(  u.^2,  v.^2);
                 Mesh = mv + mu;
                 if this.type==this.BLAS
@@ -295,8 +317,13 @@ classdef LinOpPropagator <  LinOp
                 
                 
                 if this.PhaseCorrect
-                    this.PhRampV(:,nt) = exp( (2.i * pi *dxy_ *   sin(theta_(1,nt))/lambda_(nt)) .* (1:Nx_));
-                    this.PhRampU(:,nt) = exp( (2.i * pi *dxy_ *   sin(theta_(2,nt))/lambda_(nt)) .* (1:Ny_));
+                    if this.oversample
+                        this.PhRampV(:,nt) = exp( (2.i * pi *dxy_ *   sin(theta_(1,nt))/lambda_(nt)) .* (1:2*Nx_));
+                        this.PhRampU(:,nt) = exp( (2.i * pi *dxy_ *   sin(theta_(2,nt))/lambda_(nt)) .* (1:2*Ny_));
+                    else
+                        this.PhRampV(:,nt) = exp( (2.i * pi *dxy_ *   sin(theta_(1,nt))/lambda_(nt)) .* (1:Nx_));
+                        this.PhRampU(:,nt) = exp( (2.i * pi *dxy_ *   sin(theta_(2,nt))/lambda_(nt)) .* (1:Ny_));
+                    end
                 end
             end
         end

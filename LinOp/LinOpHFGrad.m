@@ -1,12 +1,14 @@
 classdef LinOpHFGrad <  LinOp
-    %% LinOpHFGrad :
-    %  Matlab Linear Operator Library
+    %% LinOpHFGrad : gradient linear operator
+    %  
+    %  Compute the 2D spatial gradient under circular boundaries condition of an object already in Fourier domain.
+    %    
+    % :param sz: sizein of the gradient operator
     %
+    % **Example** G = LinOpHFGrad(sz)
+    %
+    % See also :class:`Map`, :class:`LinOpGrad`, :class:`LinOp`
     
-    %
-    % Please refer to the LINOP superclass for general documentation about
-    % linear operators class
-    % See also LinOp DFT Sfft iSFFT
     
     %     Copyright (C) 2015 F. Soulez ferreol.soulez@epfl.ch
     %
@@ -47,11 +49,11 @@ classdef LinOpHFGrad <  LinOp
             this.N = prod(sz);
             
             
-            der = zeros(sz);
+            der = zeros_(sz);
             der(1,1) = 1;
             der(end,1) = -1;
             this.mtfx = fft2(der);
-            der = zeros(sz);
+            der = zeros_(sz);
             der(1,1) = 1;
             der(1,end) = -1;
             
@@ -80,6 +82,5 @@ classdef LinOpHFGrad <  LinOp
             % Reimplemented from parent class :class:`LinOp`.
             M=LinOpDiag(this.sizein,1./   this.N .*(real(this.mtfx).^2 + imag(this.mtfx).^2 + real(this.mtfy).^2 + imag(this.mtfy).^2) );
         end
-        
     end
 end

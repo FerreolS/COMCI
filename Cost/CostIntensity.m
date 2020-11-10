@@ -10,11 +10,11 @@ classdef CostIntensity < Cost
     % :param w:  if type=Gaussian, w is the inverse variance of the measurement 
     %            if type=Poisson, b is the background flux.
     % :param index: index along wich dimension the intensity is summed
-    % :param type: noise model 'Gaussian' or 'Normal' for Gaussian noise or 'Poisson' for Poisson noçise.
+    % :param type: noise model 'Gaussian' or 'Normal' for Gaussian noise or 'Poisson' for Poisson noise.
     %
     % **References**
     %
-    % [1] Ferréol Soulez, Éric Thiébaut, Antony Schutz, André Ferrari, Frédéric Courbin, and Michael Unser, "Proximity operators for phase retrieval," Appl. Opt. 55, 7412-7421 (2016) 
+    % [1] FerrÃ©ol Soulez, Eric ThiÃ©baut, Antony Schutz, AndrÃ© Ferrari, FrÃ©dÃ©ric Courbin, and Michael Unser, "Proximity operators for phase retrieval," Appl. Opt. 55, 7412-7421 (2016) 
     %
     % **Example** C=...
     %
@@ -212,7 +212,7 @@ classdef CostIntensity < Cost
             end
             
             if (~isempty(this.widx))
-                ymodt = zeros(numel(x),1);
+                ymodt = zeros_(numel(x),1);
                 ymodt(~this.widx) =x(~this.widx);
                 x = x(this.widx);
                 if (~isscalar(alpha))
@@ -220,7 +220,7 @@ classdef CostIntensity < Cost
                 end
             end
             x = x(:);
-            ymod = zeros(numel(x),1);
+            ymod = zeros_(numel(x),1);
             
             switch this.noisemodel
                 case {0,1} % Gaussian case
@@ -341,7 +341,7 @@ classdef CostIntensity < Cost
             end
             
             if (~isempty(this.widx))
-                ymodt = zeros(numel(x),1);
+                ymodt = zeros_(numel(x),1);
                 ymodt(~this.widx) =x(~this.widx);
                 x = x(this.widx);
                 if (~isscalar(alpha))
@@ -349,7 +349,7 @@ classdef CostIntensity < Cost
                 end
             end
             x = x(:);
-            ymod = zeros(numel(x),1);
+            ymod = zeros_(numel(x),1);
             
             switch this.noisemodel
                 case {0,1} % Gaussian case
@@ -428,7 +428,7 @@ classdef CostIntensity < Cost
             
             
             znx = (nx~=0);
-            if (any(znx))
+            if (any(znx(:)))
                 ymod(znx)= ymod(znx)./nx(znx);
             end
             z = z.* reshape(repmat(reshape(ymod,this.imdims),this.kerdims),this.szx); % y = x ./ |x| * ymod
