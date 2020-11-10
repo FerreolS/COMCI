@@ -1,3 +1,6 @@
-SVG to PNG
+Large images must be downloaded from 
+
+SVG to PNG size(this.theta,1)
 ppp=2482  -> 1px = 65nm
+ppp=1551,2 -> 1px = 104nm
 pngtopnm -alpha USAF-1951_65nm_tilt_B.png | pnmtopng > USAF-1951_65nm_tilt_C.png
