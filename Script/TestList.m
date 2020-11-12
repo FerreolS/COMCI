@@ -1,7 +1,6 @@
-%TestSizeX100
 
-%TestSize3X100
+TestSize3X100
 
-%TestSpatCoherenceX100 
+TestSpectralCoherenceAngle30
 
-TestSpectralCoherenceX10 
+TestSpatialCoherenceAngle30
