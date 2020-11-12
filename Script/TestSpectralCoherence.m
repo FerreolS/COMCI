@@ -16,17 +16,19 @@ dsig = dlambda/(2*sqrt(2*log(2)));
     
 %%
 sr=[1:7 9 10 12 14 15 18 20];  %downsampling factor
-SNR = [0 0.001 0.002 0.005 0.0075 0.01 0.015 0.02 0.05 0.075 0.1 0.2 0.5 1] ;
+SNR = [0 0.001 0.01 0.1] ;
 wdSz = [0  0.05 0.1 0.3 0.5 0.7 0.9 1. 1.1 1.3 1.5 1.7 1.9 2.1 2.25 2.5 3 3.5 4]*1000;
-IncidenceA = [ -45 -30 -15 0 15 30 45];
-PSNR = zeros(numel(wdSz),numel(IncidenceA),numel(SNR));
+IncidenceA = [30];
+CoherenceLength = [2 5 10 15 20 40 80].*1e-6;
+PSNR = zeros(numel(wdSz),numel(CoherenceLength),numel(SNR));
 
 %%
-for a=1:numel(IncidenceA)
+for a=1:numel(CoherenceLength)
     %%
     nAngle = 1;
-    nominalAngle = [IncidenceA(a)/180*pi; 0];
-    
+    nominalAngle = [IncidenceA/180*pi; 0];
+    dsig = lambda*lambda/CoherenceLength(a)/2/sqrt(pi);
+
     
     trueIntensity=0;
     centerx = -round(z/dxy* tan(nominalAngle(1)));
