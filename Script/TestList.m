@@ -1,5 +1,5 @@
 
-TestSize3X100
+TestSizeX100
 
 TestSpectralCoherenceAngle30
 

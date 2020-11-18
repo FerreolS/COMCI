@@ -1,8 +1,9 @@
-
-PSpectCoherence = 0;
+P1 = 0;
 
 nbi=1;
-for nb = nbi:10
+%load('TestSize_x100.mat')
+%nbi = nb+1;
+for nb = nbi:100
     nb
     switch randi(5,1)
         case 1
@@ -19,10 +20,10 @@ for nb = nbi:10
            
    cshift = randi(10000,1,2)- 5000;
    truth= circshift(truth,cshift);
-   TestSpectralCoherence;
-   PSpectCoherence = PSpectCoherence + PSNR;
-   save('TestSpectralCoherence_Gauss.mat','nb','PSNR','IncidenceA','SNR','wdSz','lambda','k','z','n0','dxy','PSpectCoherence','dlambda');
-end
+   TestSize;
+   P1 = P1 + PSNR;
+   save('TestSize_x100.mat','nb','P1', 'PSNR','wdSz','SNR','IncidenceA','lambda','k','z','n0','dxy');
+send
 
 
-PSpectCoherence = PSpectCoherence ./nb;
+P1 = P1 ./nb;
