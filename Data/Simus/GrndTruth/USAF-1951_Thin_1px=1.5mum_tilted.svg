@@ -13,11 +13,11 @@
    height="2934.334"
    id="svg2"
    version="1.1"
-   inkscape:version="0.92.3 (2405546, 2018-03-11)"
+   inkscape:version="0.92.5 (2060ec1f9f, 2020-04-08)"
    sodipodi:docname="USAF-1951_Thin_1px=1.5mum_tilted.svg"
-   inkscape:export-filename="/home/ferreol/matlab/COMCI/Data/Simus/GrndTruth/USAF-1951_65nm_tilt.png"
-   inkscape:export-xdpi="2482.8201"
-   inkscape:export-ydpi="2482.8201">
+   inkscape:export-filename="/home/ferreol/matlab/COMCI/Data/Simus/GrndTruth/USAF-1951_140nm_tilt.png"
+   inkscape:export-xdpi="1152.4"
+   inkscape:export-ydpi="1152.4">
   <defs
      id="defs4" />
   <sodipodi:namedview
@@ -28,14 +28,14 @@
      inkscape:pageopacity="0"
      inkscape:pageshadow="2"
      inkscape:zoom="0.35355339"
-     inkscape:cx="1586.297"
-     inkscape:cy="1144.9156"
+     inkscape:cx="1526.9"
+     inkscape:cy="1484.3269"
      inkscape:document-units="px"
      inkscape:current-layer="g5840"
      showgrid="true"
      units="mm"
-     inkscape:window-width="2548"
-     inkscape:window-height="1404"
+     inkscape:window-width="1400"
+     inkscape:window-height="776"
      inkscape:window-x="0"
      inkscape:window-y="0"
      inkscape:window-maximized="1"
@@ -62,7 +62,7 @@
         <dc:format>image/svg+xml</dc:format>
         <dc:type
            rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
-        <dc:title></dc:title>
+        <dc:title />
         <cc:license
            rdf:resource="http://creativecommons.org/licenses/by-sa/4.0/" />
       </cc:Work>

@@ -2,5 +2,9 @@ Large images must be downloaded from https://doi.org/10.6084/m9.figshare.7998143
 
 SVG to PNG
 ppp=2482  -> 1px = 65nm
-ppp=1551,2 -> 1px = 104nm
-pngtopnm -alpha USAF-1951_65nm_tilt_B.png | pnmtopng > USAF-1951_65nm_tilt_C.png
+ppp=1551.2 -> 1px = 104nm
+ppp=1152.4 -> 1px = 140nm
+ppp=24.0791 -> 1px = 6.7microns
+
+Convert with imagemagick (increase or comment the limits set in policy.xml).
+convert -rotate 30 -density 1152.4 USAF-1951_Thin_1px=1.5mum.svg USAF-1951_140nm_tilt_C.png
