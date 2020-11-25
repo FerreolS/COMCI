@@ -177,14 +177,17 @@ classdef LinOpPropagatorH <  LinOp
             
         end
         function y = applyHtH_(this,x)
-            re = real(this.ephi).^2 + imag(this.ephi).^2;
-            y = sum(re,3)./(this.N).*x;
+            m = real(this.ephi).^2 + imag(this.ephi).^2;
+            sc2 = abs(this.scale).^2;
+            y = sum(sc2.*m,3)./(this.N).*x;
         end
         function M = makeHtH_(this)
             % Reimplemented from parent class :class:`LinOp`.
             m = real(this.ephi).^2 + imag(this.ephi).^2;
+            sc2 = abs(this.scale).^2;
+            M=LinOpDiag(this.sizein,sum(sc2.*m,3)./(this.N) );
             
-            M=LinOpDiag(this.sizein,sum(m,3)./(this.N) );
+            
         end
     end
     
