@@ -12,12 +12,8 @@ dxy= 1.04e-6 / 10;
     w = padarray( window(@tukeywin,szt(1)/2,0.), szt(1)/4,0.);
     truth = (truth.*w).*w';
 
-sr=[1:7 9 10 12 14 15 18 20];  %downsampling factor
-SNR = [0 0.001 0.002 0.005 0.0075 0.01 0.015 0.02 0.05 0.075 0.1 0.2 0.5 1] ;
-wdSz = [0 0.025 0.05 0.1 0.15 0.2 0.3 0.4 0.5 0.75 1. 1.25 1.5  1.75 2 2.5 3 3.5 4]*1000;
-IncidenceA = [-60 -45 -30 -15 0 15 30 45 60];
 %%
-PSNR = zeros(numel(wdSz),numel(IncidenceA),numel(SNR));
+PSNR = zeros(numel(wdSz),numel(IncidenceA),numel(SNR),numel(sr));
 m=1;
 
 %%

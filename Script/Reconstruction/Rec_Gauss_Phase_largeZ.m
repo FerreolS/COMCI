@@ -1,4 +1,4 @@
-run('Simu_Phase_largeZ.m');
+%run('Simu_Phase_largeZ.m');
 
 useGPU(1);
 
@@ -16,10 +16,10 @@ dxy = 6.7e-6; % Camera  pixel size
 
 
 %% Data generation
-ill = 1; % Illumination
-SNR = 35; 
-sigma = 10^(-SNR./20);
-eta = sigma./ill;
+ill = 100; % Illumination
+SNR = 20; 
+sigma = 10^(-SNR./20)*ill;
+eta = sigma./ill/3;
 sizeData = size(d1);
 data = ill.*d1 + sigma.*random('Normal',zeros(sizeData),ones(sizeData));
 
@@ -28,7 +28,7 @@ outoffov = (sqrt( 2*z*k*pi*eta.^2*cos(theta)+ sin(theta).^2) + sin(abs(theta)) )
 shift = z.*tan(theta);
 
 pixsz = min(lambda./ (outoffov./sqrt(outoffov.^2+z^2) + sin(abs(theta)))/2,[],2);
-pixsz = min(pixsz); % square pixel
+pixsz = min(pixsz) % square pixel
 sr = ceil(dxy/pixsz);
 pixsz = dxy / sr;
 
@@ -53,10 +53,12 @@ Hs = LinOpPropagator(lowfovpix,lambda, n0, z,dxy,  theta, ill,1,'BLAS2');
 %% Reshaping operator [szx  nAngle] -> [sr  szx(1)/sr  sr szx(2)/sr nAngle])
 S = LinOpShape( [fovpix  nAngle],[sr  lowfovpix(1)  sr lowfovpix(2) nAngle]);
 H = S* LinOpPropagatorH(fovpix,lambda, n0, z,pixsz,  theta, sqrt(ill)./sr,1,'BLAS2');
+H = S* LinOpPropagatorH(fovpix,lambda, n0, z,pixsz,  theta,1./sr,1,'BLAS2');
 
 %% Likelihood
-ldata =padarray(padarray(data,[rightext,bottomext],0.,'post'),[leftext,topext],0.,'pre');
-lwght =padarray(padarray( ones_(sizeData) ,[rightext,bottomext],'post'),[leftext,topext],'pre'); 
+%ldata =padarray(padarray(data,[rightext,bottomext],ill,'post'),[leftext,topext],ill,'pre');
+ldata =padarray(padarray(data/ill,[rightext,bottomext],1,'post'),[leftext,topext],1,'pre');
+lwght =padarray(padarray(ones_(sizeData) ,[rightext,bottomext],'post'),[leftext,topext],'pre'); 
 gpuCpuConverter(ldata);
 gpuCpuConverter(lwght);
 
@@ -72,14 +74,14 @@ constraint  = CostComplexCircle(fovpix,1.);
 %% init
 backprop = Hs'*ldata;
 xinit = constraint.applyProx(imresize(abs(backprop),sr),1);
-xinit = ones_(size(xinit));
+%xinit = ones_(size(xinit));
 
 %% parameter
-mu = 10.^-1;
-rho = mu.*10.^(2);
-lklRho = rho/nAngle;
-cRho  = 1.* rho;
-rglRho = rho;
+mu = .1;
+rho = mu.*100;
+lklRho = rho;
+cRho  = 1.* rho*nAngle;
+rglRho = rho/2.*nAngle;
 
 %% -- ADMM LS + TV + NonNeg
 Fn={lklCost,mu*rglCost,constraint};
@@ -90,6 +92,9 @@ ADMM=OptiADMM([],Fn,Hn,rho_n);
 % STOP when the sum successives C = F*x + Fn{1}*Hn{1}*x is lower than 1e-4 or when the distance between two successive step is lower than 1e-5
 %ADMM.CvOp=TestCvgCombine(TestCvgCostRelative(1e-4,[1 2]), 'StepRelative',1e-4);  
 ADMM.ItUpOut=10;             % call OutputOpti update every ItUpOut iterations
+ADMM.OutOp=OutputOptiCOMCI(false,10,true,[],C);
 ADMM.maxiter=1000;            % max number of iterations
 ADMM.run(fft2(xinit));      % run the algorithm 
 res = C*(ADMM.xopt);
+figure; imshow(angle(res),[])
+

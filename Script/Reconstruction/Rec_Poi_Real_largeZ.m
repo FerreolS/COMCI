@@ -1,4 +1,6 @@
-useGPU(1);
+%run('Simu_Real_largeZ.m');
+
+%useGPU(1);
 
 nAngle = 1;
 Iangle =[ 0 0]';
@@ -16,8 +18,8 @@ dxy = 6.7e-6; % Camera  pixel size
 %% Data generation
 
 sizeData = size(d1);
-nph=3;
-Shot = 100;
+nph=0;
+Shot = 0;
 ill=10.^(nph);
 dph = ill.* gather(d1);
 data = random('Poisson',dph + Shot);
@@ -26,7 +28,7 @@ sigma = std( data(:) - (dph(:) +Shot(:)));
 clear dph
 eta = gather(sigma./ill);
 %eta = sqrt(Shot)/ill;
-
+eta =0.05
 %%
 %I1p = 10.^(nph/2.+2.)./sum(I1(:)) .* I1;
 %I1n = random('Poisson',I1p + Shot);
@@ -62,17 +64,13 @@ S = LinOpShape( [fovpix*2  nAngle],[sr*2  lowfovpix(1)  sr*2 lowfovpix(2) nAngle
 H = S* LinOpPropagatorH(fovpix,lambda, n0, z,pixsz,  theta, sqrt(ill)./sr,1,'BLAS2','oversample');
 
 %% Likelihood
-ldata =padarray(padarray(data,double([rightext,bottomext]),0.,'post'),double([leftext,topext]),0.,'pre');
+ldata =padarray(padarray(data,double([rightext,bottomext]),ill,'post'),double([leftext,topext]),ill,'pre');
 lwght =padarray(padarray(Shot.*ones_(sizeData) ,[rightext,bottomext],-1,'post'),[leftext,topext],-1,'pre'); 
 
-gpuCpuConverter(ldata);
-gpuCpuConverter(lwght);
+%gpuCpuConverter(ldata);
+%gpuCpuConverter(lwght);
 
 lklCost = CostIntensity([sr*2  lowfovpix(1)  sr*2 lowfovpix(2) nAngle],ldata, lwght,[1 3],'Poisson');
-
-%lwght =padarray(padarray(1./max(Shot,data) ,[rightext,bottomext],0,'post'),[leftext,topext],0,'pre'); 
-%gpuCpuConverter(lwght);
-%lklCost = CostIntensity([sr  lowfovpix(1)  sr lowfovpix(2) nAngle],ldata, lwght,[1 3],'Gaussian');
 
 
 %% Prior
@@ -85,14 +83,14 @@ constraint  = CostReals(fovpix,0.,1.);
 %% init
 backprop = Hs'*ldata;
 xinit = constraint.applyProx(imresize(abs(backprop),sr),1);
-xinit = ones_(size(xinit));
+%xinit = ones_(size(xinit));
 
 %% parameter
-mu = 1e-1;
+mu = 1 ;
 rho = mu.*10.^(2);
-lklRho = rho/sqrt(ill)* prod(2*fovpix)/numel(data);
-cRho  = 1.* rho;
-rglRho = rho/2.;
+lklRho = rho;
+cRho  = 1.* rho*sqrt(ill);
+rglRho = rho/2.*sqrt(ill);
 
 % -- ADMM LS + TV + NonNeg
 Fn={lklCost,mu*rglCost,constraint};
@@ -103,7 +101,9 @@ ADMM=OptiADMM([],Fn,Hn,rho_n);
 % STOP when the sum successives C = F*x + Fn{1}*Hn{1}*x is lower than 1e-4 or when the distance between two successive step is lower than 1e-5
 %ADMM.CvOp=TestCvgCombine(TestCvgCostRelative(1e-4,[1 2]), 'StepRelative',1e-4);  
 ADMM.ItUpOut=10;             % call OutputOpti update every ItUpOut iterations
-ADMM.maxiter=100;            % max number of iterations
+ADMM.maxiter=1000;            % max number of iterations
+ADMM.OutOp=OutputOptiCOMCI(false,10,true,[],C);
+
 ADMM.run(fft2(xinit));      % run the algorithm 
 res = C*(ADMM.xopt);
 figure; imshow(abs(res),[])

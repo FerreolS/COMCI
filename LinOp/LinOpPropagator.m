@@ -4,11 +4,11 @@ classdef LinOpPropagator <  LinOp
     %
     %  :param sz:       size of the input
     %  :param lambda:   wavelenght [m] can be a scalar or
-    %                   a vector of size [2  Nt] where Nt is the number image.
+    %                   a vector of size [1  Nt] where Nt is the number image.
     %  :param n0:       refractive index of the medium can be a scalar or
-    %                   a vector of size [2  Nt] where Nt is the number image.
+    %                   a vector of size [1  Nt] where Nt is the number image.
     %  :param z:        depth of propagation vector  [m] can be a scalar or
-    %                   a vector of size [2  Nt] where Nt is the number image.
+    %                   a vector of size [1  Nt] where Nt is the number image.
     %  :param dxy:      pixel size            [m]
     %  :param theta:    incidence angle along x and y. It is a vector [2  Nt] where Nt is the number of incidence angles.
     %  :param illu:     the illumination wave in the sample plane. It can be a scalar for uniform illumination, a vector [1 Nt] for a different but uniform illumination at each incidence angle or a (complex) vector [sz Nt] for a random illumination
@@ -192,6 +192,14 @@ classdef LinOpPropagator <  LinOp
                 M= makeHtH_@LinOp(this);
             end
         end
+        function M = makeHHt_(this)
+            % Reimplemented from parent class :class:`LinOp`.
+            if ~this.oversample
+                M=this.makeHtH_();
+            else
+                M= makeHHt_@LinOp(this);
+            end
+        end
     end
     methods (Access = private)
         function update(this,~,~)
@@ -259,18 +267,19 @@ classdef LinOpPropagator <  LinOp
                     this.PhRampU = zeros_(Ny_,this.Nt);
                 end
             end
-            L = Nx_* dxy_/2;
+            
+            L = min(Nx_,Ny_)* dxy_/2;
             for nt = 1:this.Nt
                 %  frequency grid
-                v = 1./(Nx_ * dxy_) *( [0:ceil( Nx_/2)-1, -floor( Nx_/2):-1]' -   dxy_ *   sin(theta_(1,nt))/lambda_(nt).*Nx_);
-                u = 1./(Ny_ * dxy_) * ([0:ceil( Ny_/2)-1, -floor( Ny_/2):-1] -    dxy_ *   sin(theta_(2,nt))/lambda_(nt).*Ny_);
+                v = 1./(Nx_ * dxy_) *( [0:ceil( Nx_/2)-1, -floor( Nx_/2):-1]' -   dxy_ *   sin(theta_(1,nt)) *n0_/lambda_(nt).*Nx_);
+                u = 1./(Ny_ * dxy_) * ([0:ceil( Ny_/2)-1, -floor( Ny_/2):-1] -    dxy_ *   sin(theta_(2,nt)) *n0_/lambda_(nt).*Ny_);
 
                 [mu,mv] =  meshgrid(  u.^2,  v.^2);
                 Mesh = mv + mu;
                 if this.type==this.BLAS
                     Q = (L/sqrt(L^2+z_(nt)^2) *n0_/ lambda_(nt))^2;
                     if (max(Mesh(:))>Q)
-                        mod  =  fourierWeight_(:,:,nt).*(mv<= Q*(1-mu* (lambda_(nt)^2))).*(mu<= Q*(1-mv* (lambda_(nt)^2)));
+                        mod  =  fourierWeight_(:,:,nt).*(mv<= Q*(1-mu* ((lambda_(nt)/n0_)^2))).*(mu<= Q*(1-mv* ((lambda_(nt)/n0_)^2)));
                         Mesh(~mod )=0.;
                         this.unifFourier =  false;
                     else
@@ -312,11 +321,11 @@ classdef LinOpPropagator <  LinOp
                 
                 if this.PhaseCorrect
                     if this.oversample
-                        this.PhRampV(:,nt) = exp( (2.i * pi *dxy_ *   sin(theta_(1,nt))/lambda_(nt)) .* (1:2*Nx_));
-                        this.PhRampU(:,nt) = exp( (2.i * pi *dxy_ *   sin(theta_(2,nt))/lambda_(nt)) .* (1:2*Ny_));
+                        this.PhRampV(:,nt) = exp( (2.i * pi *dxy_ *   sin(theta_(1,nt)) *n0_/lambda_(nt)) .* (1:2*Nx_));
+                        this.PhRampU(:,nt) = exp( (2.i * pi *dxy_ *   sin(theta_(2,nt)) *n0_/lambda_(nt)) .* (1:2*Ny_));
                     else
-                        this.PhRampV(:,nt) = exp( (2.i * pi *dxy_ *   sin(theta_(1,nt))/lambda_(nt)) .* (1:Nx_));
-                        this.PhRampU(:,nt) = exp( (2.i * pi *dxy_ *   sin(theta_(2,nt))/lambda_(nt)) .* (1:Ny_));
+                        this.PhRampV(:,nt) = exp( (2.i * pi *dxy_ *   sin(theta_(1,nt)) *n0_/lambda_(nt)) .* (1:Nx_));
+                        this.PhRampU(:,nt) = exp( (2.i * pi *dxy_ *   sin(theta_(2,nt)) *n0_/lambda_(nt)) .* (1:Ny_));
                     end
                 end
             end

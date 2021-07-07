@@ -25,8 +25,8 @@ szx = size(truth)*2;
 
 
 %%
-useGPU(1);
-gpuCpuConverter(truth);
+useGPU(0);
+%gpuCpuConverter(truth);
 %%
 S = LinOpShape( [szx  ],[sr  szx(1)/sr  sr szx(2)/sr nAngle]);
 Frwrd = S*LinOpPropagator(szt,lambda, n0, z,dxyim*2,  theta, 1,1,'BLAS','oversample');
@@ -37,3 +37,4 @@ y =(abs(y)).^2;
 
 d = squeeze( sum( sum( y(:,:,:,:,:),3),1));
 d1 = d(1537:1536+1024,1537:1536+1024,:);
+d1 = d(1921:1920+256,1921:1920+256,:);
