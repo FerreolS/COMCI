@@ -38,24 +38,24 @@ SNR = 30;
 sigma = 10^(-SNR./20);
 data = max(0.,IntensityModel + sigma.*(random('Normal',zeros(sizeData),ones(sizeData)))) ;
 sz = size(data);
-t = truth(1537:1536+1024,1537:1536+1024,:);
+tc = truth(1537:1536+1024,1537:1536+1024,:);
 
 %% Error Reduction algorithm
 Pintensity = CostComplexCircle(sz,sqrt(data)); % projection on intensity
 Pphaseonly = CostComplexCircle(sz,1);
-maxiter = 100;
+maxiter = 10000;
 % init
-E = zeros(maxiter,1);
-S = zeros(maxiter,1);
+E = zeros_(maxiter,1);
+S = zeros_(maxiter,1);
 o = Pphaseonly.applyProx(H'*data,1);
 for n=1:maxiter
     dd = H*o;
     d = Pintensity.applyProx(dd,1);
     oo = H'*d;
     o = Pphaseonly.applyProx(oo,1);
-    E(n) = norm(o(:)-oo(:)) +norm(d(:)-dd(:));
-    S(n) = norm(o(:) - t(:));
-    disp(['iter : ', num2str(n), ' error :', num2str(norm(o(:)-oo(:)) +norm(d(:)-dd(:)))])
+    E(n) = 10.*log10(norm(o(:)-oo(:)) +norm(d(:)-dd(:)));
+    S(n) = 10.*log10(norm(o(:) - tc(:)));
+    disp(['iter : ', num2str(n), ' error :', num2str(E(n)), ' SNR :',num2str(S(n))])
 end
 
 %% Padded Error Reduction algorithm
