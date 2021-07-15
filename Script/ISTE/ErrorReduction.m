@@ -1,5 +1,7 @@
 %%
 clear all
+
+useGPU(1)
 SimulateModel
 
 sizeData = size(IntensityModel);
@@ -39,6 +41,8 @@ sigma = 10^(-SNR./20);
 data = max(0.,IntensityModel + sigma.*(random('Normal',zeros(sizeData),ones(sizeData)))) ;
 sz = size(data);
 tc = truth(1537:1536+1024,1537:1536+1024,:);
+t = truth(973:972+2152,973:972+2152,:);
+
 
 %% Error Reduction algorithm
 Pintensity = CostComplexCircle(sz,sqrt(data)); % projection on intensity
@@ -46,59 +50,16 @@ Pphaseonly = CostComplexCircle(sz,1);
 maxiter = 10000;
 % init
 E = zeros_(maxiter,1);
-S = zeros_(maxiter,1);
+S = zeros_(maxiter,1); 
+normXtrue=norm(t(:));
 o = Pphaseonly.applyProx(H'*data,1);
 for n=1:maxiter
     dd = H*o;
     d = Pintensity.applyProx(dd,1);
     oo = H'*d;
     o = Pphaseonly.applyProx(oo,1);
-    E(n) = 10.*log10(norm(o(:)-oo(:)) +norm(d(:)-dd(:)));
-    S(n) = 10.*log10(norm(o(:) - tc(:)));
+    E(n) = 20.*log10(norm(o(:)-oo(:)) +norm(d(:)-dd(:)));
+    po=padarray(o,[564 564],'both');
+    S(n) = 20.*log10(normXtrue/norm(t(:)-po(:)));
     disp(['iter : ', num2str(n), ' error :', num2str(E(n)), ' SNR :',num2str(S(n))])
-end
-
-%% Padded Error Reduction algorithm
-
-pdata= padarray(data,[564 564],'both');
-
-pdatainf = padarray(sqrt(data),[564 564],0.,'both');
-pdatasup = padarray(sqrt(data),[564 564],+inf,'both');
-
-psz = size(pdata);
-
-pH = LinOpPropagator(psz,lambda, n0, z,dxy,  theta, 1,1,'Fresnel');
-
-%Pintensity =CostComplexCircle(psz,sqrt(pdata)); % projection on intensity
-Pintensity =  CostComplexRing(psz,pdatainf,pdatasup);
-
-Pphaseonly = CostComplexCircle(psz,1);
-maxiter = 100;
-% init
-po = Pphaseonly.applyProx(pH'*pdata,1);
-
-for n=1:maxiter
-    dd = pH*po;
-    d = Pintensity.applyProx(dd,1);
-    oo = pH'*d;
-    po = Pphaseonly.applyProx(oo,1);
-    disp(['iter : ', num2str(n), ' error :', num2str(norm(po(:)-oo(:)) +norm(d(:)-dd(:)))])
-end
-
-%% Error Reduction algorithm with the right likelihood
-Pintensity = CostIntensity(sz,sqrt(data),1./sigma.^2,'Gaussian'); % projection on intensity
-Pphaseonly = CostComplexCircle(sz,1);
-maxiter = 100;
-% init
-El = zeros(maxiter,1);
-Sl = zeros(maxiter,1);
-o = Pphaseonly.applyProx(H'*data,1);
-for n=1:maxiter
-    dd = H*o;
-    d = Pintensity.applyProx(dd,1);
-    oo = H'*d;
-    o = Pphaseonly.applyProx(oo,1);
-    El(n) = norm(o(:)-oo(:)) +norm(d(:)-dd(:));
-    Sl(n) = norm(o(:) - t(:));
-    disp(['iter : ', num2str(n), ' error :', num2str(norm(o(:)-oo(:)) +norm(d(:)-dd(:)))])
 end

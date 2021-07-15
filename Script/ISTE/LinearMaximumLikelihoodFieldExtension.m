@@ -79,21 +79,24 @@ imshow(angle(o),[])
 title('angle(o)');
 
 %% SNR = 30 VMLMB
+pdata= padarray(data,[564 564],0.,'both');
+
 C = LinOpCpx(size(pdata)); % utility operator to go from complex to reals pair
 
 % Precision matrix
 W = LinOpDiag(size(pdata),padarray(ones(size(data)),[564 564],0.,'both'));
 
 %  Function definition
-LS=CostL2([],pdata);  % Least-Squares data term
-F=LS*W*H*C'; %cost function
+LS=CostL2(size(pdata),pdata,W);  % Least-Squares data term
+F=LS*H*C'; %cost function
 
 VMLMB=OptiVMLMB(F,[],[]);  
 VMLMB.ItUpOut=1; 
-VMLMB.maxiter=100;                             % max number of iterations
+VMLMB.maxiter=100;                  
+% max number of iterations
 VMLMB.OutOp=OutputOptiSNR(1,C*truth(973:3124,973:3124),1);
 VMLMB.m=2;                                     % number of memorized step in hessian approximation (one step is enough for quadratic function)
-VMLMB.run(C*o);                                  % run the algorithm 
+VMLMB.run(C*(exp(1.i*mod(z*k,2*pi)).*ones(size(H'*pdata))));                                  % run the algorithm 
                                   % run the algorithm 
-o = C^(-1)*VMLMB.xopt;
+o = C'*VMLMB.xopt;
 figure(); imshow(angle(o),[mod(z*k,2*pi),mod(z*k,2*pi)+1.2])

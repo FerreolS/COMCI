@@ -83,7 +83,7 @@ ADMM.OutOp=OutputOptiSNR(1,C^(-1)*t,1,[1 2]);
 % STOP when the sum successives C = F*x + Fn{1}*Hn{1}*x is lower than 1e-4 or when the distance between two successive step is lower than 1e-5
 %ADMM.CvOp=TestCvgCombine(TestCvgCostRelative(1e-4,[1 2]), 'StepRelative',1e-4);  
 ADMM.ItUpOut=1;             % call OutputOpti update every ItUpOut iterations
-ADMM.maxiter=500;            % max number of iterations
+ADMM.maxiter=1000;            % max number of iterations
 %%
 ADMM.run(C^(-1)*xinit);      % run the algorithm 
 res = C*(ADMM.xopt);

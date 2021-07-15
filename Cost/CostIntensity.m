@@ -55,6 +55,7 @@ classdef CostIntensity < Cost
         %*  2 Poisson with background w=0;
         %*  3 Poisson with background w!=0;
         %*  4 Laplace
+        %*  5 Strict
         Pcost  %base cost ( log(y!) ) for Poisson
     end
     
@@ -96,7 +97,7 @@ classdef CostIntensity < Cost
                                 this.noisemodel = 1;
                                 this.widx = (this.w>0);
                                 this.w = this.w(this.widx);
-                                this.y = this.y(this.widx);
+                                this.y = max(0.,this.y(this.widx));
                             end
                         case('Poisson')
                             if any(y(:)<0)
@@ -126,6 +127,11 @@ classdef CostIntensity < Cost
                             
                         case('Laplace')
                             this.noisemodel = 4;
+                        case('Strict')
+                            this.noisemodel = 5;
+                            this.widx = (this.w>0);
+                            this.w = this.w(this.widx);
+                            this.y = this.y(this.widx);
                     end
                 end
             end
@@ -252,6 +258,9 @@ classdef CostIntensity < Cost
                         ymod(t) = min( 1./(2.*alpha-1).*x(t), sqrt(this.y(t)));
                     end
                     
+                case 5 % strict
+                    ymod = sqrt(this.y);
+                 
                     
             end
             
@@ -302,6 +311,8 @@ classdef CostIntensity < Cost
                 case 4 % Laplace noise
                     res = abs( abs(x(:)).^2 - this.y);
                     cost = sum(res(:));
+                case 5 % strict noise
+                    cost = norm( abs(x(:)).^2 - this.y);
             end
         end
     end
